@@ -20,6 +20,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Wait for snap store
+        run: |
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if sudo snap install lxd && sudo snap install snapcraft --classic; then
+              exit 0
+            fi
+            sleep $((attempt * 15))
+          done
+          exit 1
+
       - name: Build snap
         id: build
         uses: snapcore/action-build@v1
