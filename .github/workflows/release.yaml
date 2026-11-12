@@ -30,16 +30,42 @@ jobs:
           done
           exit 1
 
-      - name: Wait for Launchpad
+      - name: Fetch Launchpad sources
         run: |
-          for attempt in $(seq 1 20); do
-            if git ls-remote https://git.launchpad.net/ubuntu/+source/qemu \
-                refs/heads/ubuntu/resolute-devel >/dev/null 2>&1; then
-              exit 0
+          mkdir -p .sources
+          for repo in qemu libvirt; do
+            ok=
+            for attempt in $(seq 1 30); do
+              rm -rf ".sources/$repo"
+              if git clone --depth 1 --branch ubuntu/resolute-devel \
+                  "https://git.launchpad.net/ubuntu/+source/$repo" ".sources/$repo"; then
+                rm -rf ".sources/$repo/.git"
+                ok=1
+                break
+              fi
+              sleep 30
+            done
+            if [ "${ok:-}" != 1 ]; then
+              echo "failed to clone $repo from Launchpad" >&2
+              exit 1
             fi
-            sleep 60
           done
-          exit 1
+          python3 -c 'import yaml' 2>/dev/null || sudo apt-get install -y python3-yaml
+          python3 - <<'PY'
+          import yaml
+
+          path = "snap/snapcraft.yaml"
+          with open(path) as f:
+              data = yaml.safe_load(f)
+
+          for part in ("qemu", "libvirt"):
+              data["parts"][part]["source"] = f".sources/{part}"
+              for key in ("source-type", "source-branch", "source-depth"):
+                  data["parts"][part].pop(key, None)
+
+          with open(path, "w") as f:
+              yaml.safe_dump(data, f, sort_keys=False)
+          PY
 
       - name: Build snap
         id: build
