@@ -30,12 +30,12 @@ jobs:
           done
           exit 1
 
-      - name: Fetch Launchpad sources
+      - name: Fetch snap sources
         run: |
           mkdir -p .sources
           for repo in qemu libvirt; do
             ok=
-            for attempt in $(seq 1 30); do
+            for attempt in $(seq 1 5); do
               rm -rf ".sources/$repo"
               if git clone --depth 1 --branch ubuntu/resolute-devel \
                   "https://git.launchpad.net/ubuntu/+source/$repo" ".sources/$repo"; then
@@ -46,8 +46,17 @@ jobs:
               sleep 30
             done
             if [ "${ok:-}" != 1 ]; then
-              echo "failed to clone $repo from Launchpad" >&2
-              exit 1
+              echo "Launchpad clone failed for $repo; falling back to the Ubuntu archive" >&2
+              sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+              sudo apt-get update -q
+              sudo apt-get install -y dpkg-dev
+              (cd .sources && apt-get source "$repo")
+              src=$(find .sources -maxdepth 1 -type d -name "$repo-[0-9]*" | head -n1)
+              if [ -z "$src" ]; then
+                echo "failed to fetch $repo source from the Ubuntu archive" >&2
+                exit 1
+              fi
+              mv "$src" ".sources/$repo"
             fi
           done
           python3 -c 'import yaml' 2>/dev/null || sudo apt-get install -y python3-yaml
