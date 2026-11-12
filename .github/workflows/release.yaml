@@ -30,6 +30,17 @@ jobs:
           done
           exit 1
 
+      - name: Wait for Launchpad
+        run: |
+          for attempt in $(seq 1 20); do
+            if git ls-remote https://git.launchpad.net/ubuntu/+source/qemu \
+                refs/heads/ubuntu/resolute-devel >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 60
+          done
+          exit 1
+
       - name: Build snap
         id: build
         uses: snapcore/action-build@v1
