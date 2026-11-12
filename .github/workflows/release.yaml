@@ -39,7 +39,6 @@ jobs:
               rm -rf ".sources/$repo"
               if git clone --depth 1 --branch ubuntu/resolute-devel \
                   "https://git.launchpad.net/ubuntu/+source/$repo" ".sources/$repo"; then
-                rm -rf ".sources/$repo/.git"
                 ok=1
                 break
               fi
@@ -57,6 +56,15 @@ jobs:
                 exit 1
               fi
               mv "$src" ".sources/$repo"
+            fi
+            if [ ! -d ".sources/$repo/.git" ]; then
+              (
+                cd ".sources/$repo"
+                git init -q
+                git add -A
+                git -c user.email=snapcraft@build -c user.name=snapcraft \
+                  commit -qm "source"
+              )
             fi
           done
           python3 -c 'import yaml' 2>/dev/null || sudo apt-get install -y python3-yaml
